@@ -8,6 +8,53 @@
 #include <pwd.h>
 #include <grp.h>
 
+void print_file_info(const char *path, int i_flag, int l_flag) {
+    struct stat file_stat;
+    char time_string[20]; // For formatted time
+
+    if (lstat(path, &file_stat) == -1) {
+        perror("stat");
+        return;
+    }
+
+    // Format the time string
+    // To simplify the printing of dates, you are to use the format
+    // mmm dd yyyy hh:mm
+    // regardless of the date
+    strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", localtime(&file_stat.st_mtime));
+
+    // Print inode number if -i is specified
+    if (i_flag) {
+        printf("%17lu", file_stat.st_ino);
+    }
+
+    // Print additional info if -l is specified
+    if (l_flag) {
+        struct passwd *pw = getpwuid(file_stat.st_uid);
+        struct group  *gr = getgrgid(file_stat.st_gid);
+
+        char perm[11];
+        snprintf(perm, sizeof(perm), "%c%c%c%c%c%c%c%c%c%c",
+                S_ISDIR(file_stat.st_mode) ? 'd' : '-',
+                file_stat.st_mode & S_IRUSR ? 'r' : '-',
+                file_stat.st_mode & S_IWUSR ? 'w' : '-',
+                file_stat.st_mode & S_IXUSR ? 'x' : '-',
+                file_stat.st_mode & S_IRGRP ? 'r' : '-',
+                file_stat.st_mode & S_IWGRP ? 'w' : '-',
+                file_stat.st_mode & S_IXGRP ? 'x' : '-',
+                file_stat.st_mode & S_IROTH ? 'r' : '-',
+                file_stat.st_mode & S_IWOTH ? 'w' : '-',
+                file_stat.st_mode & S_IXOTH ? 'x' : '-');
+
+        printf("%11s %-2ld %7s %7s", perm, (long)file_stat.st_nlink, pw->pw_name, gr->gr_name);
+
+        printf("%8ld %-17s", file_stat.st_size, time_string);
+    }
+
+    // Print file name
+    printf(" %-30s\n", path);
+}
+
 
 
 void list_directory(const char *path, int i_flag, int l_flag) {
@@ -17,9 +64,22 @@ void list_directory(const char *path, int i_flag, int l_flag) {
     char time_string[20]; // For formatted time
     const char *directory = path ? path : "."; // If no path is given, use the current directory
 
+
+    // Check if path is a file or a directory
+    if (stat(directory, &file_stat) == -1) {
+        perror("stat");
+        return;
+    }
+
+    if (S_ISREG(file_stat.st_mode)) {
+        // Path is a file, print its info
+        print_file_info(directory, i_flag, l_flag);
+        return;
+    }
+
     dir = opendir(directory);
     if (!dir) {
-        perror("opendir");
+        perror("UnixLs: cannot access directory");
         return;
     }
 
@@ -108,6 +168,7 @@ void list_directory(const char *path, int i_flag, int l_flag) {
     if (!i_flag && !l_flag) {
         printf("\n");
     }
+
     closedir(dir);
 }
 
@@ -115,6 +176,8 @@ int main(int argc, char *argv[]) {
     int opt;
     int i_flag = 0;
     int l_flag = 0;
+
+    opterr = 0; // Disable getopt error messages
 
     // Parse command-line arguments
     while ((opt = getopt(argc, argv, "il")) != -1) {
@@ -125,9 +188,13 @@ int main(int argc, char *argv[]) {
             case 'l':
                 l_flag = 1;
                 break;
+            case '?':
+                // If an unknown option is given, treat it as a directory input
+                // list_directory(argv[optind - 1], i_flag, l_flag);
+                break; // This is not strictly necessary, but it's good practice to have a break after 'case '?
             default: /* '?' */
-                fprintf(stderr, "Usage: %s [-i] [-l] [directory...]\n", argv[0]);
-                exit(EXIT_FAILURE);
+                // fprintf(stderr, "Usage: %s [-i] [-l] [directory...]\n", argv[0]);
+                // exit(EXIT_FAILURE);
         }
     }
 
