@@ -96,10 +96,18 @@ void list_directory(const char *path, int i_flag, int l_flag) {
         }
 
 
-        if (l_flag)
+        if (l_flag){
             printf("\n");
+        }
+
+        if (!i_flag && !l_flag) {
+            printf("%s   ", entry->d_name);
+        }
     }
 
+    if (!i_flag && !l_flag) {
+        printf("\n");
+    }
     closedir(dir);
 }
 
