@@ -23,6 +23,9 @@ void list_directory(const char *path, int i_flag, int l_flag) {
         return;
     }
 
+    // this is to count up to 3 prints before printing a new line
+    int i_flag_count = 0;
+
     while ((entry = readdir(dir)) != NULL) {
         // Skip hidden files if neither -i nor -l option is given
         if (entry->d_name[0] == '.' && !i_flag && !l_flag) continue;
@@ -36,8 +39,6 @@ void list_directory(const char *path, int i_flag, int l_flag) {
                 continue;
             }
 
-
-
             // Format the time string
             // To simplify the printing of dates, you are to use the format
             // mmm dd yyyy hh:mm
@@ -46,11 +47,23 @@ void list_directory(const char *path, int i_flag, int l_flag) {
         }
 
         // Print inode number if -i is specified
-        // if (i_flag) {
-        //     printf("%20lu", entry->d_ino);
-        // }
+        if (i_flag) {
+            printf("%17lu", entry->d_ino);
 
-        
+            if (!l_flag) {
+                i_flag_count++;
+
+
+                // Print file name
+                printf(" %-30s", entry->d_name);
+
+                if (i_flag_count == 3) {
+                    i_flag_count = 0;
+                    printf("\n");
+                }
+            }
+
+        }
 
 
 
@@ -73,16 +86,18 @@ void list_directory(const char *path, int i_flag, int l_flag) {
                     file_stat.st_mode & S_IWOTH ? 'w' : '-',
                     file_stat.st_mode & S_IXOTH ? 'x' : '-');
 
-            printf("%8s %3ld %8s %8s", perm, (long)file_stat.st_nlink, pw->pw_name, gr->gr_name);
+            printf("%11s %-2ld %7s %7s", perm, (long)file_stat.st_nlink, pw->pw_name, gr->gr_name);
 
 
-            printf("%8ld %20s", file_stat.st_size, time_string);
+            printf("%8ld %-17s", file_stat.st_size, time_string);
+
+            // Print file name
+            printf(" %-30s", entry->d_name);
         }
 
-        // Print file name
-        printf("%30s", entry->d_name);
 
-        printf("\n");
+        if (l_flag)
+            printf("\n");
     }
 
     closedir(dir);

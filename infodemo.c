@@ -1,4 +1,5 @@
-
+#include <pwd.h>
+#include <grp.h>
 
 void getAndPrintGroup(gid_t grpNum) {
   struct group *grp;
