@@ -7,6 +7,26 @@
 #include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
+#include <stdbool.h>
+#include <string.h>
+
+// Some difference between this program and the regular ls:
+// 
+// 1. The time format is different. The regular ls uses the format mmm dd hh:mm
+// while this program uses mmm dd yyyy hh:mm regardless of the date.
+
+// 2. If input is:
+//   ./UnixLs -iW 
+// This program will consider the W as a directory or file input
+// So this program will look for the directory W, and return error if not found
+// while the regular ls command will consider W as a flag and provide an error
+
+// This program provides more spacing for each column for the unknown sized variables like
+// user name, group name, and file size. This is to make the output more readable.
+
+// To mimic the ls command, This program does not print theinformation for . and .. and any
+// directory/files that start with . 
+
 
 void print_file_info(const char *path, int i_flag, int l_flag) {
     struct stat file_stat;
@@ -67,7 +87,7 @@ void list_directory(const char *path, int i_flag, int l_flag) {
 
     // Check if path is a file or a directory
     if (stat(directory, &file_stat) == -1) {
-        perror("stat");
+        perror("error");
         return;
     }
 
@@ -87,6 +107,12 @@ void list_directory(const char *path, int i_flag, int l_flag) {
     int i_flag_count = 0;
 
     while ((entry = readdir(dir)) != NULL) {
+
+        // skip the . and .. directory
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || entry->d_name[0] == '.') {
+            continue;
+        }
+
         // Skip hidden files if neither -i nor -l option is given
         if (entry->d_name[0] == '.' && !i_flag && !l_flag) continue;
 
@@ -95,7 +121,7 @@ void list_directory(const char *path, int i_flag, int l_flag) {
             char full_path[1024];
             snprintf(full_path, sizeof(full_path), "%s/%s", directory, entry->d_name);
             if (lstat(full_path, &file_stat) == -1) {
-                perror("stat");
+                perror("error");
                 continue;
             }
 
@@ -179,6 +205,9 @@ int main(int argc, char *argv[]) {
 
     opterr = 0; // Disable getopt error messages
 
+
+    bool no_flag = false;
+
     // Parse command-line arguments
     while ((opt = getopt(argc, argv, "il")) != -1) {
         switch (opt) {
@@ -189,8 +218,9 @@ int main(int argc, char *argv[]) {
                 l_flag = 1;
                 break;
             case '?':
+                no_flag = true;
                 // If an unknown option is given, treat it as a directory input
-                // list_directory(argv[optind - 1], i_flag, l_flag);
+                list_directory(argv[optind - 1], i_flag, l_flag);
                 break; // This is not strictly necessary, but it's good practice to have a break after 'case '?
             default: /* '?' */
                 // fprintf(stderr, "Usage: %s [-i] [-l] [directory...]\n", argv[0]);
@@ -200,13 +230,15 @@ int main(int argc, char *argv[]) {
 
     // List the current directory or specified directories
 
-    if (optind == argc) {
-        // No extra arguments were passed; list current directory
-        list_directory(NULL, i_flag, l_flag);
-    } else {
-        // List directories provided as arguments
-        for (; optind < argc; optind++) {
-            list_directory(argv[optind], i_flag, l_flag);
+    if (no_flag == false) {
+        if (optind == argc) {
+            // No extra arguments were passed; list current directory
+            list_directory(NULL, i_flag, l_flag);
+        } else {
+            // List directories provided as arguments
+            for (; optind < argc; optind++) {
+                list_directory(argv[optind], i_flag, l_flag);
+            }
         }
     }
 
