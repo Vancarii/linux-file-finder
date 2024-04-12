@@ -10,6 +10,13 @@
 #include <stdbool.h>
 #include <string.h>
 
+// ----------------------
+// Yecheng Wang
+// 301540271
+// CMPT300 Assignment 4
+// April 12th 2024
+// -----------------------
+
 // Some difference between this program and the regular ls:
 // 
 // 1. The time format is different. The regular ls uses the format mmm dd hh:mm
@@ -26,6 +33,9 @@
 
 // To mimic the ls command, This program does not print theinformation for . and .. and any
 // directory/files that start with .
+
+// In this program, for the case of -i flag by itself, 
+// the program lists 3 columns of files for each line
 
 
 // function to print the additional information when -l is specified
