@@ -38,6 +38,7 @@ void print_l_flag(struct stat file_stat, const char *file, char time_string[20])
 
     if (!pw || !gr) {
         perror("UnixLs: cannot get user or group name");
+        // return;
     }
 
     char perm[11];
@@ -91,6 +92,11 @@ void print_file_info(const char *file, int i_flag, int l_flag) {
 
     if (l_flag) {
         print_l_flag(file_stat, file, time_string);
+        printf("\n");
+    }
+
+    if (!i_flag && !l_flag) {
+        printf("%s\n", file);
     }
 
 
@@ -104,7 +110,6 @@ void list_directory(const char *path, int i_flag, int l_flag) {
     struct stat file_stat;
     char time_string[20]; // For formatted time
     const char *directory = path ? path : "."; // If no path is given, use the current directory
-
 
     // Check if the input is valid
     if (stat(directory, &file_stat) == -1) {
@@ -129,6 +134,12 @@ void list_directory(const char *path, int i_flag, int l_flag) {
 
     while ((entry = readdir(dir)) != NULL) {
 
+        if (!entry) {
+            perror("UnixLs: cannot read directory");
+            closedir(dir);
+            return;
+        }
+        
         // skip the . and .. directory
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || entry->d_name[0] == '.') {
             continue;
@@ -173,13 +184,21 @@ void list_directory(const char *path, int i_flag, int l_flag) {
             }
 
             // Format the time string
-            strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", localtime(&file_stat.st_mtime));
+            struct tm *time_info = localtime(&file_stat.st_mtime);
+            if (!time_info) {
+                perror("UnixLs: cannot convert time");
+                closedir(dir);
+                continue;
+            }
+            strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", time_info);
+
+            // Format the time string
+            // strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", localtime(&file_stat.st_mtime));
         
             print_l_flag(file_stat, entry->d_name, time_string);
             printf("\n");
         
         }
-
 
 
         // formatting
@@ -189,9 +208,18 @@ void list_directory(const char *path, int i_flag, int l_flag) {
         }
     }
 
-    if (!i_flag && !l_flag) {
+    if (!l_flag) {
         printf("\n");
     }
+
+    // if (!i_flag && !l_flag) {
+    //     printf("\n");
+    // }
+
+    // if (i_flag && !l_flag){
+    //     printf("\n");
+    // }
+
 
     closedir(dir);
 }
