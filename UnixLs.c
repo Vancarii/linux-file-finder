@@ -192,9 +192,7 @@ void list_directory(const char *path, int i_flag, int l_flag) {
             }
             strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", time_info);
 
-            // Format the time string
-            // strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", localtime(&file_stat.st_mtime));
-        
+
             print_l_flag(file_stat, entry->d_name, time_string);
             printf("\n");
         
@@ -211,15 +209,6 @@ void list_directory(const char *path, int i_flag, int l_flag) {
     if (!l_flag) {
         printf("\n");
     }
-
-    // if (!i_flag && !l_flag) {
-    //     printf("\n");
-    // }
-
-    // if (i_flag && !l_flag){
-    //     printf("\n");
-    // }
-
 
     closedir(dir);
 }
