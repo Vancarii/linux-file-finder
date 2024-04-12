@@ -25,14 +25,51 @@
 // user name, group name, and file size. This is to make the output more readable.
 
 // To mimic the ls command, This program does not print theinformation for . and .. and any
-// directory/files that start with . 
+// directory/files that start with .
 
 
-void print_file_info(const char *path, int i_flag, int l_flag) {
+// function to print the additional information when -l is specified
+// since we require this process for both directories and files
+void print_l_flag(struct stat file_stat, const char *file, char time_string[20]) {
+
+    // Print additional info if -l is specified
+    struct passwd *pw = getpwuid(file_stat.st_uid);
+    struct group  *gr = getgrgid(file_stat.st_gid);
+
+    if (!pw || !gr) {
+        perror("UnixLs: cannot get user or group name");
+    }
+
+    char perm[11];
+    snprintf(perm, sizeof(perm), "%c%c%c%c%c%c%c%c%c%c",
+            S_ISDIR(file_stat.st_mode) ? 'd' : '-',
+            file_stat.st_mode & S_IRUSR ? 'r' : '-',
+            file_stat.st_mode & S_IWUSR ? 'w' : '-',
+            file_stat.st_mode & S_IXUSR ? 'x' : '-',
+            file_stat.st_mode & S_IRGRP ? 'r' : '-',
+            file_stat.st_mode & S_IWGRP ? 'w' : '-',
+            file_stat.st_mode & S_IXGRP ? 'x' : '-',
+            file_stat.st_mode & S_IROTH ? 'r' : '-',
+            file_stat.st_mode & S_IWOTH ? 'w' : '-',
+            file_stat.st_mode & S_IXOTH ? 'x' : '-');
+
+    printf("%11s %-2ld %7s %7s", perm, (long)file_stat.st_nlink, pw->pw_name, gr->gr_name);
+
+    printf("%8ld %-17s", file_stat.st_size, time_string);
+
+    // Print file name
+    printf(" %-30s", file);
+
+}
+
+// function to use to print file info
+// when the user inputs a file and not a directory, we only print that 
+// one file information without looking for the directory
+void print_file_info(const char *file, int i_flag, int l_flag) {
     struct stat file_stat;
     char time_string[20]; // For formatted time
 
-    if (lstat(path, &file_stat) == -1) {
+    if (lstat(file, &file_stat) == -1) {
         perror("stat");
         return;
     }
@@ -46,33 +83,17 @@ void print_file_info(const char *path, int i_flag, int l_flag) {
     // Print inode number if -i is specified
     if (i_flag) {
         printf("%17lu", file_stat.st_ino);
+
+        if (!l_flag) {
+            printf(" %-30s\n", file);
+        }
     }
 
-    // Print additional info if -l is specified
     if (l_flag) {
-        struct passwd *pw = getpwuid(file_stat.st_uid);
-        struct group  *gr = getgrgid(file_stat.st_gid);
-
-        char perm[11];
-        snprintf(perm, sizeof(perm), "%c%c%c%c%c%c%c%c%c%c",
-                S_ISDIR(file_stat.st_mode) ? 'd' : '-',
-                file_stat.st_mode & S_IRUSR ? 'r' : '-',
-                file_stat.st_mode & S_IWUSR ? 'w' : '-',
-                file_stat.st_mode & S_IXUSR ? 'x' : '-',
-                file_stat.st_mode & S_IRGRP ? 'r' : '-',
-                file_stat.st_mode & S_IWGRP ? 'w' : '-',
-                file_stat.st_mode & S_IXGRP ? 'x' : '-',
-                file_stat.st_mode & S_IROTH ? 'r' : '-',
-                file_stat.st_mode & S_IWOTH ? 'w' : '-',
-                file_stat.st_mode & S_IXOTH ? 'x' : '-');
-
-        printf("%11s %-2ld %7s %7s", perm, (long)file_stat.st_nlink, pw->pw_name, gr->gr_name);
-
-        printf("%8ld %-17s", file_stat.st_size, time_string);
+        print_l_flag(file_stat, file, time_string);
     }
 
-    // Print file name
-    printf(" %-30s\n", path);
+
 }
 
 
@@ -85,14 +106,14 @@ void list_directory(const char *path, int i_flag, int l_flag) {
     const char *directory = path ? path : "."; // If no path is given, use the current directory
 
 
-    // Check if path is a file or a directory
+    // Check if the input is valid
     if (stat(directory, &file_stat) == -1) {
         perror("error");
         return;
     }
 
+    // check if the path is a file 
     if (S_ISREG(file_stat.st_mode)) {
-        // Path is a file, print its info
         print_file_info(directory, i_flag, l_flag);
         return;
     }
@@ -113,33 +134,14 @@ void list_directory(const char *path, int i_flag, int l_flag) {
             continue;
         }
 
-        // Skip hidden files if neither -i nor -l option is given
-        if (entry->d_name[0] == '.' && !i_flag && !l_flag) continue;
-
-        // If -l is specified, get more info with stat
-        if (l_flag) {
-            char full_path[1024];
-            snprintf(full_path, sizeof(full_path), "%s/%s", directory, entry->d_name);
-            if (lstat(full_path, &file_stat) == -1) {
-                perror("error");
-                continue;
-            }
-
-            // Format the time string
-            // To simplify the printing of dates, you are to use the format
-            // mmm dd yyyy hh:mm
-            // regardless of the date
-            strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", localtime(&file_stat.st_mtime));
-        }
-
         // Print inode number if -i is specified
+        // print 3 files/columns per line
         if (i_flag) {
             printf("%17lu", entry->d_ino);
 
             if (!l_flag) {
+
                 i_flag_count++;
-
-
                 // Print file name
                 printf(" %-30s", entry->d_name);
 
@@ -152,39 +154,35 @@ void list_directory(const char *path, int i_flag, int l_flag) {
         }
 
 
-
-        // Print additional info if -l is specified
+        // If -l is specified, get more info with stat
         if (l_flag) {
+            char full_path[1024];
+            int ret = snprintf(full_path, sizeof(full_path), "%s/%s", directory, entry->d_name);
 
-            struct passwd *pw = getpwuid(file_stat.st_uid);
-            struct group  *gr = getgrgid(file_stat.st_gid);
+            // length check
+            if (ret < 0 || ret >= sizeof(full_path)) {
+                perror("UnixLs: path is too long");
+                continue;
+            }
 
-            char perm[11];
-            snprintf(perm, sizeof(perm), "%c%c%c%c%c%c%c%c%c%c",
-                    S_ISDIR(file_stat.st_mode) ? 'd' : '-',
-                    file_stat.st_mode & S_IRUSR ? 'r' : '-',
-                    file_stat.st_mode & S_IWUSR ? 'w' : '-',
-                    file_stat.st_mode & S_IXUSR ? 'x' : '-',
-                    file_stat.st_mode & S_IRGRP ? 'r' : '-',
-                    file_stat.st_mode & S_IWGRP ? 'w' : '-',
-                    file_stat.st_mode & S_IXGRP ? 'x' : '-',
-                    file_stat.st_mode & S_IROTH ? 'r' : '-',
-                    file_stat.st_mode & S_IWOTH ? 'w' : '-',
-                    file_stat.st_mode & S_IXOTH ? 'x' : '-');
+            // Get file info
+            if (lstat(full_path, &file_stat) == -1) {
+                perror("error");
+                closedir(dir);
+                continue;
+            }
 
-            printf("%11s %-2ld %7s %7s", perm, (long)file_stat.st_nlink, pw->pw_name, gr->gr_name);
-
-
-            printf("%8ld %-17s", file_stat.st_size, time_string);
-
-            // Print file name
-            printf(" %-30s", entry->d_name);
-        }
-
-
-        if (l_flag){
+            // Format the time string
+            strftime(time_string, sizeof(time_string), "%b %d %Y %H:%M", localtime(&file_stat.st_mtime));
+        
+            print_l_flag(file_stat, entry->d_name, time_string);
             printf("\n");
+        
         }
+
+
+
+        // formatting
 
         if (!i_flag && !l_flag) {
             printf("%s   ", entry->d_name);
@@ -203,8 +201,9 @@ int main(int argc, char *argv[]) {
     int i_flag = 0;
     int l_flag = 0;
 
-    opterr = 0; // Disable getopt error messages
-
+    // Disables getopt error messages
+    // since we want to interpret the wrong flags as directories or files
+    opterr = 0;
 
     bool no_flag = false;
 
@@ -221,10 +220,8 @@ int main(int argc, char *argv[]) {
                 no_flag = true;
                 // If an unknown option is given, treat it as a directory input
                 list_directory(argv[optind - 1], i_flag, l_flag);
-                break; // This is not strictly necessary, but it's good practice to have a break after 'case '?
-            default: /* '?' */
-                // fprintf(stderr, "Usage: %s [-i] [-l] [directory...]\n", argv[0]);
-                // exit(EXIT_FAILURE);
+                break; 
+            default:
         }
     }
 
@@ -232,7 +229,8 @@ int main(int argc, char *argv[]) {
 
     if (no_flag == false) {
         if (optind == argc) {
-            // No extra arguments were passed; list current directory
+            // No extra arguments were passed
+            // use the current directory
             list_directory(NULL, i_flag, l_flag);
         } else {
             // List directories provided as arguments
